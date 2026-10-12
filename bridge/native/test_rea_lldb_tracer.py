@@ -22,6 +22,45 @@ spec.loader.exec_module(tracer)
 
 
 class NativeTraceBudgetTests(unittest.TestCase):
+    def test_source_coordinates_preserve_partial_metadata_without_reading_source(self):
+        def address(valid=True, file_valid=True, line=23, column=7):
+            class SourceFileSpec:
+                def IsValid(self):
+                    return file_valid
+
+                def __str__(self):
+                    return "/missing/é space/fixture.pas"
+
+            file_spec = SourceFileSpec()
+            entry = types.SimpleNamespace(
+                IsValid=lambda: valid,
+                GetFileSpec=lambda: file_spec,
+                GetLine=lambda: line,
+                GetColumn=lambda: column,
+            )
+            return types.SimpleNamespace(GetLineEntry=lambda: entry)
+
+        self.assertEqual(
+            tracer._source_location(address()),
+            {"file_path": "/missing/é space/fixture.pas", "line": 23, "column": 7},
+        )
+        self.assertEqual(
+            tracer._source_location(address(column=0)),
+            {"file_path": "/missing/é space/fixture.pas", "line": 23, "column": None},
+        )
+        self.assertEqual(
+            tracer._source_location(address(file_valid=False)),
+            {"file_path": None, "line": 23, "column": 7},
+        )
+        self.assertEqual(
+            tracer._source_location(address(line=0)),
+            {"file_path": "/missing/é space/fixture.pas", "line": None, "column": 7},
+        )
+        self.assertIsNone(tracer._source_location(address(valid=False)))
+        self.assertIsNone(
+            tracer._source_location(address(file_valid=False, line=0, column=0))
+        )
+
     def test_journal_checks_exact_byte_budget_before_writing(self):
         record = {"kind": "other-stop", "reason": "signal"}
         encoded_size = len((tracer.json.dumps(record) + "\n").encode("utf-8"))
@@ -154,6 +193,9 @@ class NativeTraceBudgetTests(unittest.TestCase):
                 return FileSpec()
 
         class Address:
+            def GetLineEntry(self):
+                return types.SimpleNamespace(IsValid=lambda: False)
+
             def GetModule(self):
                 return Module()
 
@@ -228,6 +270,9 @@ class NativeTraceBudgetTests(unittest.TestCase):
                 return FileSpec()
 
         class Address:
+            def GetLineEntry(self):
+                return types.SimpleNamespace(IsValid=lambda: False)
+
             def GetModule(self):
                 return Module()
 

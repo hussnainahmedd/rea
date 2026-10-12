@@ -50,6 +50,25 @@ const observation = (
 };
 
 describe("LLDB retained observations", () => {
+  it("preserves partial source coordinates while accepting historical omission", () => {
+    const attributed = {
+      ...event,
+      source_location: {
+        file_path: "/missing/fixture.pas",
+        line: 23,
+        column: null,
+      },
+    };
+    const journal =
+      [event, attributed]
+        .map((entry) => JSON.stringify({ kind: "event", event: entry }))
+        .join("\n") + "\n";
+    expect(observation("cancelled", journal).events).toEqual([
+      event,
+      attributed,
+    ]);
+  });
+
   it.each([
     ["cancellation", "cancelled"],
     ["bridge failure", "tracer-failure"],

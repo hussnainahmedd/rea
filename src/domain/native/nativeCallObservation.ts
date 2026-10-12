@@ -114,6 +114,15 @@ export const nativeCodeLocationSchema = z.strictObject({
   module: z.string().nullable(),
   module_path: z.string().nullable(),
   symbol: z.string().nullable(),
+  /** LLDB line-table attribution; does not verify source file contents. */
+  source_location: z
+    .strictObject({
+      file_path: z.string().min(1).nullable(),
+      line: z.number().int().positive().nullable(),
+      column: z.number().int().positive().nullable(),
+    })
+    .nullable()
+    .optional(),
 });
 
 /** One observed entry into a requested function or method. */
