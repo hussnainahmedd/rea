@@ -39,6 +39,15 @@ const inspect = (result) => {
     ["0x0", "0x1", "0x2"],
   );
   assert.equal(result.breakpoints[0].location_count, 1);
+  for (const event of result.events) {
+    assert.equal(event.backtrace.length, 1);
+    assert.equal(event.backtrace[0].source_location?.file_path, source);
+    assert.equal(event.backtrace[0].module_path, join(directory, "calls"));
+    assert.ok(
+      [14, 15].includes(event.backtrace[0].source_location.line),
+      "caller is the Pascal loop/call site",
+    );
+  }
   for (const location of [
     ...result.events,
     ...result.breakpoints[0].locations,
@@ -52,19 +61,32 @@ const stable = (result) =>
     file_address: event.file_address,
     source_location: event.source_location,
     registers: event.registers,
+    callers: event.backtrace.map((frame) => ({
+      file_address: frame.file_address,
+      symbol: frame.symbol,
+      source_location: frame.source_location,
+    })),
   }));
 try {
-  const version = (await execute(compiler, ["-iV"])).stdout.trim();
-  const architecture = (await execute(compiler, ["-iTP"])).stdout.trim();
-  await execute(compiler, [
-    "-dDEBUG",
-    "-gw3",
-    "-O-",
-    "-Xs-",
-    `-FE${directory}`,
-    `-FU${directory}`,
-    source,
-  ]);
+  const version = (
+    await execute(compiler, ["-iV"], { timeout: 30_000 })
+  ).stdout.trim();
+  const architecture = (
+    await execute(compiler, ["-iTP"], { timeout: 30_000 })
+  ).stdout.trim();
+  await execute(
+    compiler,
+    [
+      "-dDEBUG",
+      "-gw3",
+      "-O-",
+      "-Xs-",
+      `-FE${directory}`,
+      `-FU${directory}`,
+      source,
+    ],
+    { timeout: 120_000 },
+  );
   const binary = join(directory, "calls");
   const cli = await artifactCli(
     "observe-native-calls",
