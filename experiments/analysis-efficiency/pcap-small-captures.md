@@ -250,3 +250,12 @@ parent Evidence ID for both summary and page views. SDK acceptance and factual
 grading reject mismatches and missing digests while preserving complete
 deliveries. Before/after private actual-reply mutations verify both view roles;
 unmodified deliveries and four stored original-model factual regrades pass.
+
+The SDK observation boundary additionally authenticates each complete, summary
+and page envelope with the selected runtime’s existing `parseEvidence` owner.
+It preserves the original envelope, without duplicating semantic-ID hashing.
+Format-valid swapped-ID mutations over actual SDK replies pass before this
+guard and fail afterward; unmodified complete/summary controls pass. The model
+grader tests selected facts against cited transcript receipts; its synthetic
+fixtures do not establish Evidence authentication. The original real-model
+receipts are independently authenticated against the pinned runtime.

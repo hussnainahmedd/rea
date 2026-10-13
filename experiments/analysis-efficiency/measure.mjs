@@ -524,15 +524,11 @@ const inspectEvmTarget = async () => {
 };
 
 const PCAP_EVIDENCE_ID = /^ev_[a-f0-9]{64}$/u;
-const pcapObservation = (evidence, requestedView) => {
-  if (
-    !Array.isArray(evidence.limitations) ||
-    !evidence.limitations.every((item) => typeof item === "string")
-  )
-    throw new Error("PCAP Evidence lacks a valid limitations list");
+const pcapObservation = (evidence, requestedView, parseEvidence) => {
+  // Authenticate with the selected runtime's owner, preserving the original
+  // envelope for measurement and provenance rather than reconstructing it.
+  parseEvidence(evidence);
   const evidenceId = evidence.evidence_id;
-  if (typeof evidenceId !== "string" || !PCAP_EVIDENCE_ID.test(evidenceId))
-    throw new Error("PCAP Evidence receipt identity is missing or malformed");
   const value = normalized(evidence);
   for (const key of ["limitations", "unknowns"])
     if (
@@ -609,6 +605,10 @@ const pcapObservation = (evidence, requestedView) => {
   };
 };
 const inspectPcapTarget = async () => {
+  const { parseEvidence } = await import(
+    pathToFileURL(resolve(values["runtime-root"], "dist/domain/evidence.js"))
+      .href
+  );
   const input = {
     path: values.path,
     ...(values.delivery === "summary" ? { detail: "summary" } : {}),
@@ -627,6 +627,7 @@ const inspectPcapTarget = async () => {
     pcapObservation(
       inspected,
       values.delivery === "summary" ? { kind: "summary" } : undefined,
+      parseEvidence,
     ),
   ];
   let capture, uris;
@@ -651,7 +652,7 @@ const inspectPcapTarget = async () => {
       view,
     });
     const page = normalized(selected);
-    const observation = pcapObservation(selected, view);
+    const observation = pcapObservation(selected, view, parseEvidence);
     const total = capture.retained_counts.http_request_uris;
     const examined = Math.min(view.limit, total);
     const expectedCoverage = {
