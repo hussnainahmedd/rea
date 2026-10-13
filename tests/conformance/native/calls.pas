@@ -11,6 +11,6 @@ end;
 var
   Index: LongInt;
 begin
-  for Index := 0 to 2 do
-    ReaPascalCall(Index);
+  for Index := 0 to 2 do { REA_VERIFY_CALLER_LOOP }
+    ReaPascalCall(Index); { REA_VERIFY_CALLER_CALL }
 end.

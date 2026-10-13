@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -20,6 +20,16 @@ if (process.platform !== "darwin" || !isAbsolute(compiler ?? ""))
   );
 const source = fileURLToPath(
   new URL("../tests/conformance/native/calls.pas", import.meta.url),
+);
+const fixtureLines = (await readFile(source, "utf8")).split(/\r?\n/u);
+const callerLines = new Set(
+  ["REA_VERIFY_CALLER_LOOP", "REA_VERIFY_CALLER_CALL"].map((marker) => {
+    const matches = fixtureLines.flatMap((line, index) =>
+      line.includes(marker) ? [index + 1] : [],
+    );
+    assert.equal(matches.length, 1, `fixture has one ${marker} marker`);
+    return matches[0];
+  }),
 );
 const directory = await mkdtemp(join(tmpdir(), "rea-pascal-calls-"));
 const input = {
@@ -44,7 +54,7 @@ const inspect = (result) => {
     assert.equal(event.backtrace[0].source_location?.file_path, source);
     assert.equal(event.backtrace[0].module_path, join(directory, "calls"));
     assert.ok(
-      [14, 15].includes(event.backtrace[0].source_location.line),
+      callerLines.has(event.backtrace[0].source_location.line),
       "caller is the Pascal loop/call site",
     );
   }
@@ -69,10 +79,13 @@ const stable = (result) =>
   }));
 try {
   const version = (
-    await execute(compiler, ["-iV"], { timeout: 30_000 })
+    await execute(compiler, ["-iV"], { timeout: 30_000, killSignal: "SIGKILL" })
   ).stdout.trim();
   const architecture = (
-    await execute(compiler, ["-iTP"], { timeout: 30_000 })
+    await execute(compiler, ["-iTP"], {
+      timeout: 30_000,
+      killSignal: "SIGKILL",
+    })
   ).stdout.trim();
   await execute(
     compiler,
@@ -85,7 +98,7 @@ try {
       `-FU${directory}`,
       source,
     ],
-    { timeout: 120_000 },
+    { timeout: 120_000, killSignal: "SIGKILL" },
   );
   const binary = join(directory, "calls");
   const cli = await artifactCli(
