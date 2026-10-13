@@ -300,6 +300,7 @@ def main():
                 len(cited) == 1 or (len(cited) == 2 and all(
                     isinstance(record['normalized_result'].get('parent_evidence_id'), str)
                     and re.fullmatch(r'ev_[a-f0-9]{64}', record['normalized_result']['parent_evidence_id'])
+                    and record['normalized_result'].get('parent_digest') == record['normalized_result']['parent_evidence_id'][3:]
                     and record['normalized_result']['parent_evidence_id'] != record['evidence_id']
                     and isinstance(record.get('evidence_links'), list)
                     and record['normalized_result']['parent_evidence_id'] in record['evidence_links']

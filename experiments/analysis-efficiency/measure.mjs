@@ -575,6 +575,11 @@ const pcapObservation = (evidence, requestedView) => {
       !evidence.evidence_links.includes(value.parent_evidence_id))
   )
     throw new Error("PCAP retained parent lacks a distinct Evidence link");
+  if (
+    requestedView &&
+    value.parent_digest !== value.parent_evidence_id.slice(3)
+  )
+    throw new Error("PCAP retained parent digest differs from its identity");
   const parameters = requestedView
     ? { parent_evidence_id: value.parent_evidence_id, view: requestedView }
     : { path: values.path };

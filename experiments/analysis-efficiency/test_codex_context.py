@@ -100,6 +100,7 @@ class PcapGraderWorkflowTests(unittest.TestCase):
                     'source_coverage': 'complete', 'artifact': capture['target'],
                     'limitations': ['source', 'view'], 'unknowns': ['unrecorded traffic']}}
         for record in [summary, page]:
+            record['normalized_result']['parent_digest'] = parent[3:]
             record['parameters'] = {'parent_evidence_id': parent, 'view': copy.deepcopy(record['normalized_result']['view'])}
         observations = [self.observation(value) for value in [summary, page]]
         reference = {'artifact_sha256': 'd' * 64, 'capture': capture,
@@ -354,6 +355,19 @@ class PcapGraderWorkflowTests(unittest.TestCase):
                 with self.subTest(index=index, nested=field, wrong=wrong):
                     answer, records, reference = self.fixture();records[index]['normalized_result'][field] = wrong
                     self.assertFalse(self.grade(answer, records, reference, tools)['all_factual_checks_pass'])
+
+    def test_retained_parent_digest_must_match_its_declared_identity(self):
+        for index in [0, 1]:
+            for digest in [None, {}, [], True, 'digest', 'e' * 64]:
+                with self.subTest(index=index, digest=digest):
+                    answer, records, reference = self.fixture()
+                    records[index]['normalized_result']['parent_digest'] = digest
+                    report = self.grade(answer, records, reference)
+                    self.assertTrue(report['factual_checks']['pcap_original_delivery_observations'])
+                    self.assertFalse(report['all_factual_checks_pass'])
+            answer, records, reference = self.fixture()
+            records[index]['normalized_result'].pop('parent_digest')
+            self.assertFalse(self.grade(answer, records, reference)['all_factual_checks_pass'])
 
     def test_summary_outer_artifact_must_identify_the_selected_capture(self):
         for wrong in [None, {}, [], 'artifact',
