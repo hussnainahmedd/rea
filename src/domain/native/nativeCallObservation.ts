@@ -122,7 +122,10 @@ export const nativeCodeLocationSchema = z.strictObject({
       column: z.number().int().positive().nullable(),
     })
     .nullable()
-    .optional(),
+    .optional()
+    .describe(
+      "Compiler or debugger source attribution only; REA does not read or verify the named source-file bytes.",
+    ),
 });
 
 /** One observed entry into a requested function or method. */

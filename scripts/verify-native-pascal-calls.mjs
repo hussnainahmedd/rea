@@ -4,7 +4,6 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { promisify } from "node:util";
 
 import {
   artifactCli,
@@ -12,7 +11,44 @@ import {
   withArtifactMcp,
 } from "./lib/artifact-e2e.mjs";
 
-const execute = promisify(execFile);
+const execute = (command, arguments_, { timeout }) =>
+  new Promise((resolve, reject) => {
+    let timedOut = false;
+    const child = execFile(
+      command,
+      arguments_,
+      { detached: true, encoding: "utf8" },
+      (error, stdout, stderr) => {
+        clearTimeout(deadline);
+        if (timedOut) {
+          const failure = new Error(`Command timed out after ${timeout} ms`);
+          Object.assign(failure, {
+            code: "ETIMEDOUT",
+            killed: true,
+            signal: "SIGKILL",
+            stdout,
+            stderr,
+          });
+          reject(failure);
+        } else if (error !== null) {
+          reject(error);
+        } else {
+          resolve({ stdout, stderr });
+        }
+      },
+    );
+    const deadline = setTimeout(() => {
+      timedOut = true;
+      if (child.pid === undefined) return;
+      try {
+        // This script only runs on macOS. detached:true gives the owned
+        // compiler invocation its own process group, inherited by FPC tools.
+        process.kill(-child.pid, "SIGKILL");
+      } catch (cause) {
+        if (cause.code !== "ESRCH") child.kill("SIGKILL");
+      }
+    }, timeout);
+  });
 const compiler = process.env.REA_VERIFY_FPC_COMMAND;
 if (process.platform !== "darwin" || !isAbsolute(compiler ?? ""))
   throw new Error(
@@ -79,12 +115,11 @@ const stable = (result) =>
   }));
 try {
   const version = (
-    await execute(compiler, ["-iV"], { timeout: 30_000, killSignal: "SIGKILL" })
+    await execute(compiler, ["-iV"], { timeout: 30_000 })
   ).stdout.trim();
   const architecture = (
     await execute(compiler, ["-iTP"], {
       timeout: 30_000,
-      killSignal: "SIGKILL",
     })
   ).stdout.trim();
   await execute(
@@ -98,7 +133,7 @@ try {
       `-FU${directory}`,
       source,
     ],
-    { timeout: 120_000, killSignal: "SIGKILL" },
+    { timeout: 120_000 },
   );
   const binary = join(directory, "calls");
   const cli = await artifactCli(
